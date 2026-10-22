@@ -1,0 +1,46 @@
+# DeepFusionGuard — pinned dependencies (resolved for Python 3.12, Oct 2026)
+#
+# Local CPU install (via scripts/setup_env.sh):
+#   uv pip install -r requirements.txt --torch-backend cpu
+# Colab/Kaggle GPU: torch is preinstalled there; see notebooks/colab_setup.ipynb (Step 6).
+#
+# Version notes:
+# - torch is held at 2.11.0 because torchaudio's latest release is 2.11.0 and it must match
+#   torch exactly. torchvision 0.26.0 is the matching release.
+# - numpy 2.5 and librosa 1.0 require Python >= 3.12, so the project uses Python 3.12.
+# - facenet-pytorch (MTCNN) is NOT used: it pins torch<2.3 and numpy<2. Face + mouth
+#   detection uses OpenCV's built-in YuNet detector (cv2.FaceDetectorYN) instead.
+# - Only opencv-python-headless is installed (grad-cam depends on it). Never add
+#   opencv-python as well: both packages write the same cv2 folder and break each other.
+
+# --- Deep learning core ---
+torch==2.11.0
+torchvision==0.26.0
+torchaudio==2.11.0
+transformers==5.18.0
+
+# --- Vision / audio / speech ---
+opencv-python-headless==5.0.0.93
+librosa==1.0.0
+soundfile==0.14.0
+faster-whisper==1.2.1
+
+# --- Data / ML utilities ---
+numpy==2.5.3
+pandas==3.0.6
+scikit-learn==1.9.1
+pyyaml==6.0.3
+tqdm==4.70.1
+matplotlib==3.11.2
+psutil==7.2.2
+
+# --- Explainability ---
+grad-cam==1.5.7
+captum==0.9.0
+
+# --- App ---
+fastapi==0.142.2
+uvicorn==0.54.0
+
+# --- Testing ---
+pytest==9.1.1
