@@ -1,0 +1,130 @@
+# DeepFusionGuard — central configuration.
+#
+# How it works:
+#   1. Everything below `profiles:` is the BASE config.
+#   2. The active profile (local / colab) is deep-merged on top of it.
+#      Profile choice: --profile flag > DFG_PROFILE env var > auto (colab if running on Colab) > local.
+#   3. Single values can be overridden from the command line:  --set train.batch_size=8
+#   4. Strings like ${env:NAME,default} are replaced by the environment variable NAME (or default).
+#   5. Relative paths are resolved against the repo root, so scripts work from any folder.
+#
+# All scripts accept: --config, --profile, --device, --set   (see src/utils/cli.py)
+
+project: DeepFusionGuard
+seed: 42
+device: auto            # auto = cuda if available else cpu
+
+paths:
+  # Fast working disk: raw data, preprocessed clips, cached features.
+  work_root: data
+  # Must survive the session: checkpoints, logs, archives. Drive on Colab.
+  persist_root: data/runs
+  samples: data/samples
+  # Sub-folders (joined onto the roots by src/utils/config.py:get_path)
+  raw_dir: raw
+  processed_dir: processed
+  features_dir: features
+  splits_dir: splits
+  checkpoints_dir: checkpoints
+  logs_dir: logs
+  model_cache: data/model_cache          # small helper models (e.g. YuNet .onnx)
+
+runtime:
+  num_threads: 4          # torch.set_num_threads; laptop has 4 threads
+  num_workers: 2          # DataLoader workers
+  free_memory_between_models: true   # del model; gc.collect() after each encoder
+
+preprocess:
+  num_frames: 16
+  face_size: 224          # face crop, pixels (square)
+  mouth_size: 224         # mouth crop, pixels (square); fed to CLIP like the face
+  mouth_box_scale: 1.8    # mouth box width = scale x distance between mouth corners
+  face_margin: 0.25       # extra border around the detected face box (fraction)
+  face_detector: yunet    # OpenCV cv2.FaceDetectorYN (5 landmarks incl. mouth corners)
+  yunet_model: face_detection_yunet_2023mar.onnx    # stored in paths.model_cache
+  yunet_url: https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx
+  face_score_threshold: 0.6
+  min_face_frames: 8      # clip is flagged if fewer frames than this contain a face
+  sample_rate: 16000      # Hz, mono
+  transcript:
+    engine: faster-whisper
+    model: base           # tiny | base | small ...
+    compute_type: int8    # int8 on CPU; float16 on GPU (set in colab profile)
+    language: null        # null = auto-detect
+
+models:
+  image: openai/clip-vit-base-patch16
+  audio: facebook/wav2vec2-base
+  text: FacebookAI/roberta-base
+  detectgpt_scoring: openai-community/gpt2         # Fast-DetectGPT scoring model
+  detectgpt_reference: openai-community/gpt2       # Fast-DetectGPT sampling/reference model
+  dims:                   # encoder output sizes; must match the models above
+    image: 512            # CLIP ViT-B/16 projected image embedding
+    audio: 768            # wav2vec2-base hidden size (XLS-R 300M = 1024)
+    text: 768             # RoBERTa-base hidden size
+
+fusion:
+  d_model: 256
+  num_heads: 4
+  temporal_layers: 2
+  dropout: 0.1
+  modality_dropout: 0.3
+  classifier_hidden: 128
+  classifier_dropout: 0.3
+  modalities: [video, audio, text]
+
+train:
+  batch_size: 4
+  epochs: 3
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  early_stopping_patience: 5
+  metric_for_best: auc
+
+splits:
+  identity_disjoint: true
+  ratios: {train: 0.7, val: 0.15, test: 0.15}
+
+# Dataset folders, relative to <work_root>/<raw_dir>. Nothing is downloaded automatically.
+datasets:
+  faces_140k:      {dir: 140k_real_fake_faces, modality: image, access: open}
+  hc3:             {dir: hc3,                  modality: text,  access: open}
+  asvspoof2019_la: {dir: ASVspoof2019_LA,      modality: audio, access: open}
+  asvspoof2021_la: {dir: ASVspoof2021_LA,      modality: audio, access: open}
+  in_the_wild:     {dir: in_the_wild,          modality: audio, access: open}
+  ffpp:            {dir: FaceForensics++,      modality: video, access: request_form}
+  fakeavceleb:     {dir: FakeAVCeleb,          modality: audio_video, access: request_form}
+  celebdf_v2:      {dir: Celeb-DF-v2,          modality: video, access: request_form}
+  lavdf:           {dir: LAV-DF,               modality: audio_video, access: request_form}
+  av_deepfake1m_pp:   {dir: AV-Deepfake1M++,   modality: audio_video, access: test_only}
+  deepfake_eval_2024: {dir: Deepfake-Eval-2024, modality: mixed, access: test_only}
+
+profiles:
+  local:
+    # Laptop: CPU only, small models (see "Accepted changes" in README).
+    device: auto
+
+  colab:
+    paths:
+      # Set by notebooks/colab_setup.ipynb; defaults match its settings cell.
+      work_root: ${env:DFG_LOCAL_ROOT,/content/dfg_work}
+      persist_root: ${env:DFG_DRIVE_ROOT,/content/drive/MyDrive/DeepFusionGuard}
+      model_cache: ${env:DFG_DRIVE_ROOT,/content/drive/MyDrive/DeepFusionGuard}/model_cache
+    runtime:
+      num_threads: 2      # Colab free gives 2 vCPUs
+      num_workers: 2
+    preprocess:
+      transcript:
+        model: small
+        compute_type: float16
+    models:
+      # Original-plan models. Large downloads (cached on Drive via HF_HOME):
+      #   wav2vec2-xls-r-300m ~1.3 GB, gpt-neo-2.7B ~5-10 GB. Ask the team before first use.
+      audio: facebook/wav2vec2-xls-r-300m
+      detectgpt_scoring: EleutherAI/gpt-neo-2.7B
+      detectgpt_reference: EleutherAI/gpt-neo-2.7B
+      dims:
+        audio: 1024
+    train:
+      batch_size: 32
+      epochs: 20

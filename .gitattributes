@@ -1,0 +1,30 @@
+# Line endings: same files work on Linux, Colab and Windows.
+# Git stores text with LF; these rules fix what each OS gets on checkout.
+* text=auto
+
+# Must stay LF: bash fails on CRLF ("$'\r': command not found"), Colab is Linux.
+*.sh     text eol=lf
+*.py     text eol=lf
+*.yaml   text eol=lf
+*.yml    text eol=lf
+*.toml   text eol=lf
+*.ipynb  text eol=lf
+*.md     text eol=lf
+*.txt    text eol=lf
+
+# Windows-only scripts need CRLF.
+*.ps1    text eol=crlf
+*.bat    text eol=crlf
+*.cmd    text eol=crlf
+
+# Binary files: never touch.
+*.npy    binary
+*.pt     binary
+*.pth    binary
+*.onnx   binary
+*.wav    binary
+*.mp4    binary
+*.png    binary
+*.jpg    binary
+*.zip    binary
+*.tar    binary

@@ -1,0 +1,26 @@
+# Virtual env & caches
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Data, features, model weights (never commit). Only data/README.md is tracked.
+data/*
+!data/README.md
+*.pt
+*.pth
+*.onnx
+*.npy
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Archives — never commit
+*.zip
+*.tar
+*.tar.gz
